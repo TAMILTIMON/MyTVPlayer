@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My TV Player</title>
+<style>
+  body{font-family:system-ui,Arial,sans-serif;background:#12161a;color:#eee;margin:0;padding:16px;max-width:720px;margin:auto}
+  h1{font-size:24px}
+  h2{font-size:17px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .card{background:#1e2327;border-radius:10px;padding:14px;margin-bottom:14px}
+  input,textarea{width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;border-radius:6px;border:1px solid #3a4046;background:#12161a;color:#eee;font-size:15px}
+  button{background:#2f6bff;color:#fff;border:0;border-radius:6px;padding:10px 16px;font-size:15px}
+  button.del{background:#5a2a2a;padding:6px 10px;font-size:13px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #2c3238}
+  .row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #msg{min-height:20px;margin-bottom:10px;color:#8ab4f8}
+</style>
+</head>
+<body>
+<h1>My TV Player</h1>
+
+<div class="card">
+  <h2>Add a video</h2>
+  <input id="pl" list="pls" placeholder="Playlist name (new or existing)">
+  <datalist id="pls"></datalist>
+  <input id="ti" placeholder="Title (optional)">
+  <input id="ur" placeholder="Video link, https://...">
+  <button onclick="add()">Add</button>
+</div>
+
+<div class="card">
+  <h2>Import an M3U playlist</h2>
+  <input id="ipl" list="pls" placeholder="Playlist name (new or existing)">
+  <input id="lk" placeholder="Link to an .m3u file">
+  <textarea id="tx" rows="4" placeholder="...or paste the M3U text here"></textarea>
+  <button onclick="imp()">Import</button>
+</div>
+
+<div id="msg"></div>
+<div id="lists"></div>
+
+<script>
+function $(i){return document.getElementById(i);}
+function say(t){$('msg').textContent=t;}
+async function post(path,obj){
+  const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(obj)});
+  return r.json();
+}
+async function load(){
+  try{const r=await fetch('/data');const d=await r.json();render(d.playlists);}
+  catch(e){say('Cannot reach the TV. Is the app open on the TV?');}
+}
+function render(pls){
+  const dl=$('pls');dl.innerHTML='';
+  const box=$('lists');box.innerHTML='';
+  pls.forEach(function(p){
+    const o=document.createElement('option');o.value=p.name;dl.appendChild(o);
+    const c=document.createElement('div');c.className='card';
+    const h=document.createElement('h2');
+    const ht=document.createElement('span');ht.textContent=p.name+' ('+p.items.length+')';
+    const dp=document.createElement('button');dp.textContent='Delete playlist';dp.className='del';
+    dp.onclick=async function(){if(confirm('Delete playlist '+p.name+'?')){await post('/delpl',{playlist:p.name});load();}};
+    h.appendChild(ht);h.appendChild(dp);c.appendChild(h);
+    p.items.forEach(function(it,i){
+      const row=document.createElement('div');row.className='row';
+      const s=document.createElement('span');s.textContent=it.t;s.title=it.u;
+      const b=document.createElement('button');b.textContent='Remove';b.className='del';
+      b.onclick=async function(){await post('/del',{playlist:p.name,idx:i});load();};
+      row.appendChild(s);row.appendChild(b);c.appendChild(row);
+    });
+    box.appendChild(c);
+  });
+}
+async function add(){
+  const r=await post('/add',{playlist:$('pl').value,title:$('ti').value,url:$('ur').value});
+  say(r.ok?'Added.':(r.msg||'Failed'));
+  if(r.ok){$('ti').value='';$('ur').value='';}
+  load();
+}
+async function imp(){
+  const r=await post('/import',{playlist:$('ipl').value,link:$('lk').value,text:$('tx').value});
+  say(r.ok?('Imported '+r.added+' videos.'):(r.msg||'Failed'));
+  if(r.ok){$('lk').value='';$('tx').value='';}
+  load();
+}
+load();
+</script>
+</body>
+</html>
