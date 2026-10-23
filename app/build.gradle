@@ -7,16 +7,42 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.mytv.player'
+        applicationId 'com.tamil.castplay'
         minSdk 21
         targetSdk 34
-        versionCode 1
-        versionName '1.0'
+        versionCode = (System.getenv('VCODE') ?: '16').toInteger()
+        versionName = '2.3.1' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+    }
+
+    // One APK per CPU type keeps the download small. "universal" works on every TV.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a'
+            universalApk true
+        }
+    }
+
+    // Fixed signing key from GitHub Secrets -> every build installs over the previous one.
+    signingConfigs {
+        if (System.getenv('TCP_KEYSTORE')) {
+            tcp {
+                storeFile file(System.getenv('TCP_KEYSTORE'))
+                storePassword System.getenv('TCP_STORE_PASSWORD')
+                keyAlias System.getenv('TCP_KEY_ALIAS')
+                keyPassword System.getenv('TCP_KEY_PASSWORD')
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            if (System.getenv('TCP_KEYSTORE')) signingConfig signingConfigs.tcp
+        }
+        debug {
+            if (System.getenv('TCP_KEYSTORE')) signingConfig signingConfigs.tcp
         }
     }
 
@@ -26,18 +52,36 @@ android {
     }
 
     packaging {
+        jniLibs {
+            useLegacyPackaging true
+        }
         resources {
             excludes += ['META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/DEPENDENCIES']
         }
     }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+// APK files are named TamilCastPlay-armeabi-v7a-debug.apk etc.
+base {
+    archivesName = 'TamilCastPlay'
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'androidx.media3:media3-exoplayer:1.3.1'
-    implementation 'androidx.media3:media3-exoplayer-hls:1.3.1'
-    implementation 'androidx.media3:media3-exoplayer-dash:1.3.1'
-    implementation 'androidx.media3:media3-exoplayer-rtsp:1.3.1'
-    implementation 'androidx.media3:media3-ui:1.3.1'
+
+    // VLC engine: plays almost every format/codec, equalizer, volume boost, subtitles, tracks.
+    implementation 'org.videolan.android:libvlc-all:3.6.2'
+
+    // Phone web page / remote control.
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
+
+    // Magnet / .torrent streaming.
+    implementation 'org.libtorrent4j:libtorrent4j:2.1.0-35'
+    implementation 'org.libtorrent4j:libtorrent4j-android-arm:2.1.0-35'
+    implementation 'org.libtorrent4j:libtorrent4j-android-arm64:2.1.0-35'
 }
